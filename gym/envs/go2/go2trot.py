@@ -48,8 +48,16 @@ class Go2Trot(LeggedRobot):
             dtype=torch.float,
             device=self.device,
         )
+
+        height_range = self.cfg.commands.ranges.base_height
+        self.height_command_mid = 0.5 * (height_range[0] + height_range[1])  # 0.30
+        self.height_command_max = 0.5 * (height_range[1] - height_range[0])  # 0.10
+        self.height_command = torch.zeros(
+            self.num_envs, 1, dtype=torch.float, device=self.device)
+        
         self._update_phase_observation()
         self._update_gait_reference()
+
 
     def _update_phase_observation(self):
         self.phase_obs[:, 0:1] = torch.sin(self.phase)
@@ -144,6 +152,25 @@ class Go2Trot(LeggedRobot):
                 torch.rand(self.num_envs, 1, device=self.device) >= 0.9
             )
             self.commands.masked_fill_(drop, 0.0)
+
+        self._resample_height_command(command_mask)
+
+    def _resample_height_command(self, command_mask):
+        height = torch_rand_float(
+            -self.height_command_max, self.height_command_max,
+            shape=self.height_command.shape, device=self.device,
+        )
+        extreme = (
+            torch.rand(self.height_command.shape, device=self.device)
+            < self.cfg.commands.height_extreme_prob
+        )
+        # snap the "extreme" ones to exactly -0.10 or +0.10
+        height = torch.where(extreme, torch.sign(height) * self.height_command_max, height)
+        masked_update(self.height_command, height, command_mask)
+
+    def base_height_target(self):
+        """Commanded absolute base height [m]."""
+        return self.height_command_mid + self.height_command
 
     def _reset_idx(self, reset_mask):
         super()._reset_idx(reset_mask)
@@ -252,3 +279,8 @@ class Go2Trot(LeggedRobot):
             ),
             dim=1,
         )
+    
+    def _reward_tracking_base_height(self):
+        error = (self.base_height - self.base_height_target()).flatten()
+        error /= self.scales["base_height"]                    # divide by 0.3
+        return self._sqrdexp(error, self.cfg.reward_settings.height_tracking_sigma)

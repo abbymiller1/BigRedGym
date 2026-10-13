@@ -60,9 +60,12 @@ class Go2TrotCfg(Go2Cfg):
 
     class commands(Go2Cfg.commands):
         var = 1.0
+        # Fraction of height resamples that pick the min or max height exactly.
+        height_extreme_prob = 0.5
 
         class ranges(Go2Cfg.commands.ranges):
             lin_vel_x = [-1.0, 0.0, 1.0, 3.0]
+            base_height = [0.20, 0.40]   # min, max commanded height [m]
 
     class push_robots(Go2Cfg.push_robots):
         toggle = True
@@ -92,6 +95,7 @@ class Go2TrotCfg(Go2Cfg):
 
     class reward_settings(Go2Cfg.reward_settings):
         base_height_target = Go2Cfg.reward_settings.base_height_target
+        height_tracking_sigma = 0.25
 
     class scaling(Go2Cfg.scaling):
         # Canonical RobotLayout order is FL, FR, RL, RR, with
@@ -101,6 +105,7 @@ class Go2TrotCfg(Go2Cfg):
         dof_pos_obs = dof_pos
         dof_pos_target = [0.5 * x for x in dof_pos]
         tau_ff = 4 * [23.7, 23.7, 45.43]
+        height_command = 0.1
 
 
 class Go2TrotRunnerCfg(Go2RunnerCfg):
@@ -112,6 +117,7 @@ class Go2TrotRunnerCfg(Go2RunnerCfg):
             "base_ang_vel",
             "projected_gravity",
             "commands",
+            "height_command",
             "dof_pos_obs",
             "dof_vel",
             "dof_pos_target",
@@ -138,10 +144,12 @@ class Go2TrotRunnerCfg(Go2RunnerCfg):
         activation = "elu"
         obs = [
             "base_height",
+            "height_command",
             "base_lin_vel",
             "base_ang_vel",
             "projected_gravity",
             "commands",
+            "height_command",
             "dof_pos_obs",
             "dof_vel",
             "dof_pos_target",
@@ -161,7 +169,8 @@ class Go2TrotRunnerCfg(Go2RunnerCfg):
                 dof_pos_limits = 0.0
                 feet_contact_forces = 0.0
                 dof_near_home = 0.0
-                min_base_height = 0.5
+                min_base_height = 0.0
+                tracking_base_height = 2.0
                 action_rate = 0.25
                 action_rate2 = 0.025
                 trot_support = 0.625

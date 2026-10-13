@@ -64,6 +64,44 @@ class FakeEnv:
     def reset(self):
         self.reset_count += 1
 
+class FakeHeightEnv(FakeEnv):
+    """FakeEnv plus the base-height command surface Go2Trot exposes."""
+
+    def __init__(self, num_envs=2):
+        super().__init__(num_envs)
+        self.height_command_mid = 0.30
+        self.height_command_max = 0.10
+        self.height_command = torch.full((num_envs, 1), 0.05)
+
+    def base_height_target(self):
+        return self.height_command_mid + self.height_command
+
+
+def test_up_down_step_height_command_and_clamp():
+    env = FakeHeightEnv()
+    cmds = TeleopCommands(env)
+    assert torch.all(env.height_command == 0.0)  # starts at mid-range
+    cmds.apply("up")
+    assert env.height_command[0, 0].item() == pytest.approx(cmds.increment_height)
+    cmds.apply("down")
+    cmds.apply("down")
+    assert env.height_command[0, 0].item() == pytest.approx(-cmds.increment_height)
+    for _ in range(20):
+        cmds.apply("up")
+    assert env.base_height_target()[0, 0].item() == pytest.approx(0.40)
+    for _ in range(40):
+        cmds.apply("down")
+    assert env.base_height_target()[0, 0].item() == pytest.approx(0.20)
+    assert torch.all(env.commands[:, 1:] == 0.0)  # velocities untouched
+
+
+def test_up_down_are_noops_without_height_command():
+    env = FakeEnv()
+    cmds = TeleopCommands(env)
+    before = env.commands.clone()
+    cmds.apply("up")
+    cmds.apply("down")
+    assert torch.equal(env.commands, before)
 
 def _make_vsim():
     env = FakeEnv()
