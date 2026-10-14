@@ -54,6 +54,12 @@ class Go2Trot(LeggedRobot):
         self.height_command_max = 0.5 * (height_range[1] - height_range[0])  # 0.10
         self.height_command = torch.zeros(
             self.num_envs, 1, dtype=torch.float, device=self.device)
+
+        self._gait_height_gains = torch.tensor(
+            self.cfg.control.gait_height_gains,
+            dtype=torch.float,
+            device=self.device,
+        )
         
         self._update_phase_observation()
         self._update_gait_reference()
@@ -68,6 +74,7 @@ class Go2Trot(LeggedRobot):
         self.gait_reference[:] = (
             self._gait_joint_offsets
             + self._gait_joint_amplitudes * torch.sin(joint_phase)
+            + self._gait_height_gains * self.height_command
         )
 
     def _leg_phases(self):
