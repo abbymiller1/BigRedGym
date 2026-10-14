@@ -52,6 +52,7 @@ def _reference(task):
     reference = torch.tensor(cfg.control.gait_joint_offsets) + torch.tensor(
         cfg.control.gait_joint_amplitudes
     ) * torch.sin(task.phase + 2 * torch.pi * phases)
+    reference += torch.tensor(cfg.control.gait_height_gains) * task.height_command
     return reference + task.default_dof_pos[:, task.actuated_dof_indices]
 
 
@@ -155,3 +156,30 @@ def test_command_limits_follow_permuted_actuators_with_passive_dofs(monkeypatch)
         [[lower[index] for index in indices], [upper[index] for index in indices]]
     )
     torch.testing.assert_close(full_command, expected, atol=2e-6, rtol=0)
+
+def test_height_command_resamples_within_range_and_hits_extremes(task):
+    lo, hi = task.cfg.commands.ranges.base_height
+    task.height_command = torch.zeros(4096, 1)
+    task.num_envs = 4096
+    task._resample_height_command(torch.ones(4096, dtype=torch.bool))
+    target = task.base_height_target()
+    assert target.min() >= lo - 1e-6 and target.max() <= hi + 1e-6
+    at_extreme = (target - lo).abs().lt(1e-6) | (target - hi).abs().lt(1e-6)
+    assert 0.3 < at_extreme.float().mean() < 0.7
+    assert (target > task.height_command_mid).any()
+    assert (target < task.height_command_mid).any()
+
+
+def test_height_command_observation_is_normalized(task):
+    task.height_command[:] = task.height_command_max
+    torch.testing.assert_close(task.get_state("height_command"), torch.ones(2, 1))
+    task.height_command[:] = -task.height_command_max
+    torch.testing.assert_close(task.get_state("height_command"), -torch.ones(2, 1))
+
+
+def test_height_tracking_reward_peaks_at_commanded_height(task):
+    task.height_command[:] = torch.tensor([[-0.1], [0.1]])
+    task.root_states[:, 2] = task.base_height_target().squeeze(1)
+    torch.testing.assert_close(task._reward_tracking_base_height(), torch.ones(2))
+    task.root_states[:, 2] += 0.10
+    assert torch.all(task._reward_tracking_base_height() < 0.9)

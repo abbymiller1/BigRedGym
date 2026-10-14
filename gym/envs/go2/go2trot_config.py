@@ -3,7 +3,7 @@ from gym.envs.go2.go2_config import Go2Cfg, Go2RunnerCfg
 
 class Go2TrotCfg(Go2Cfg):
     class env(Go2Cfg.env):
-        episode_length_s = 5
+        episode_length_s = 10
 
     class init_state(Go2Cfg.init_state):
         # The gait reference supplies the nominal posture; residual targets
@@ -57,6 +57,7 @@ class Go2TrotCfg(Go2Cfg):
         # shortening the swing diagonal.
         gait_joint_offsets = 4 * [0.0, 0.96, -1.36]
         gait_joint_amplitudes = 4 * [0.0, -0.15, 0.30]
+        gait_height_gains = 4 * [0.0, -3.0, 5.0]
 
     class commands(Go2Cfg.commands):
         var = 1.0
@@ -65,7 +66,7 @@ class Go2TrotCfg(Go2Cfg):
 
         class ranges(Go2Cfg.commands.ranges):
             lin_vel_x = [-1.0, 0.0, 1.0, 3.0]
-            base_height = [0.20, 0.40]   # min, max commanded height [m]
+            base_height = [0.20, 0.35]   # min, max commanded height [m]
 
     class push_robots(Go2Cfg.push_robots):
         toggle = True
@@ -95,7 +96,7 @@ class Go2TrotCfg(Go2Cfg):
 
     class reward_settings(Go2Cfg.reward_settings):
         base_height_target = Go2Cfg.reward_settings.base_height_target
-        height_tracking_sigma = 0.25
+        height_tracking_sigma = 0.1
 
     class scaling(Go2Cfg.scaling):
         # Canonical RobotLayout order is FL, FR, RL, RR, with
@@ -105,7 +106,7 @@ class Go2TrotCfg(Go2Cfg):
         dof_pos_obs = dof_pos
         dof_pos_target = [0.5 * x for x in dof_pos]
         tau_ff = 4 * [23.7, 23.7, 45.43]
-        height_command = 0.1
+        height_command = 0.075
 
 
 class Go2TrotRunnerCfg(Go2RunnerCfg):
@@ -144,7 +145,6 @@ class Go2TrotRunnerCfg(Go2RunnerCfg):
         activation = "elu"
         obs = [
             "base_height",
-            "height_command",
             "base_lin_vel",
             "base_ang_vel",
             "projected_gravity",
@@ -170,7 +170,7 @@ class Go2TrotRunnerCfg(Go2RunnerCfg):
                 feet_contact_forces = 0.0
                 dof_near_home = 0.0
                 min_base_height = 0.0
-                tracking_base_height = 2.0
+                tracking_base_height = 6.0
                 action_rate = 0.25
                 action_rate2 = 0.025
                 trot_support = 0.625

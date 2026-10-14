@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import torch  # noqa: E402
 
-from scripts.play import get_play_args, setup  # noqa: E402
+from play import get_play_args, setup  # noqa: E402
 
 
 def get_args():
