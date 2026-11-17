@@ -91,7 +91,7 @@ class Go2TrotCfg(Go2Cfg):
             neg_scale = 0.2
 
     class scaling(Go2Cfg.scaling):
-        dof_pos_target = 4 * [0.1, 0.1, 0.1]  # paper sigma_a; try [0.2,0.3,0.3] if stuck
+        dof_pos_target = 4 * [0.2, 0.3, 0.3]  # Go2 needs more than the paper's 0.1
         dof_pos_target_hist = 2 * Go2Cfg.scaling.dof_pos  # list repeat -> 24
         dof_vel_hist = 3 * Go2Cfg.scaling.dof_vel  # -> 36
 

@@ -47,14 +47,7 @@ class OffPolicyRunner(BaseRunner):
         rewards_dict = self.initialize_rewards_dict(n_policy_steps)
 
         self.alg.switch_to_train()
-        actor_obs = torch.cat((raw_obs, policy_state), dim=1)
-        self.last_estimate = estimate
-        return actor_obs, raw_obs, se_targets, estimate
-
-    def estimated_base_lin_vel(self):
-        """Latest estimated body-frame velocity [m/s], shape (num_envs, 3)."""
-        scale = torch.as_tensor(self.env.scales["base_lin_vel"], device=self.device)
-        return self.last_estimate[:, :3] * scale
+        actor_obs = self.get_obs(self.actor_cfg["obs"])
         critic_obs = self.get_obs(self.critic_cfg["obs"])
         actions = self.alg.act(actor_obs)
         tot_iter = self.it + self.num_learning_iterations
@@ -194,10 +187,6 @@ class OffPolicyRunner(BaseRunner):
             logger.toc("iteration")
             logger.toc("runtime")
             logger.print_to_terminal()
-            print(
-                f"{'state estimator loss':>35}: {self.se.mean_loss:.4f}\n"
-                f"{'velocity estimate RMSE':>35}: {self.se.vel_rmse:.3f} m/s\n"
-            )
 
             if self.it % self.save_interval == 0:
                 self.save()
