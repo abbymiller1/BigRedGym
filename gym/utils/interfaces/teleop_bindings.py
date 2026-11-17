@@ -44,8 +44,11 @@ BINDINGS = {
     "up": "UP",
     "down": "DOWN",
     "reset": "R",
+    "friction": "F",
 }
 
+# Ground friction levels cycled by F (proposal test surfaces; 0.2 = slippery).
+FRICTION_LEVELS = (0.8, 0.4, 0.2)
 # key name → action name (translated by each viewer adapter)
 KEY_TO_ACTION = {key: action for action, key in BINDINGS.items()}
 
@@ -57,6 +60,7 @@ HELP_LINES = (
     "  R             reset envs",
     "  Esc / window  quit",
     "  commands step in 1/5 increments of max",
+    "  F             cycle ground friction 0.8 / 0.4 / 0.2 (slippery)",
 )
 
 
@@ -79,10 +83,17 @@ class TeleopCommands:
         self.max_vel_yaw = 2.0
         self.increment_yaw = self.max_vel_yaw * 0.2
 
+        
+        self.friction_index = 0
+        if hasattr(env, "set_ground_friction"):
+            env.set_ground_friction(FRICTION_LEVELS[0])
+
         env.commands[:] = 0.0
         env.commands[:, 0] = 1.0  # seed forward velocity so motion is visible
         if hasattr(env.cfg, "commands"):
             env.cfg.commands.resampling_time = env.max_episode_length_s + 1
+
+        
 
     def apply(self, action: str) -> None:
         """Apply one discrete press of ``action`` (see BINDINGS)."""
@@ -101,6 +112,13 @@ class TeleopCommands:
             c[:, 2] = torch.clamp(c[:, 2] + self.increment_yaw, max=self.max_vel_yaw)
         elif action == "yaw_right":
             c[:, 2] = torch.clamp(c[:, 2] - self.increment_yaw, min=-self.max_vel_yaw)
+        elif action == "friction":
+            if not hasattr(self.env, "set_ground_friction"):
+                return
+            self.friction_index = (self.friction_index + 1) % len(FRICTION_LEVELS)
+            mu = FRICTION_LEVELS[self.friction_index]
+            self.env.set_ground_friction(mu)
+            print(f"ground friction: mu = {mu}")        
         elif action == "reset":
             self.env.timed_out[:] = True
             self.env.reset()

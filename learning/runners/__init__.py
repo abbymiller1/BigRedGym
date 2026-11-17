@@ -32,17 +32,20 @@
 
 from .custom_critic_runner import CustomCriticRunner
 from .datalogging_runner import DataLoggingRunner
+from .estimator_runner import EstimatorRunner
 from .my_runner import MyRunner
 from .off_policy_runner import OffPolicyRunner
 from .old_policy_runner import OldPolicyRunner
 from .on_policy_runner import OnPolicyRunner
 from .psd_sac_runner import PSACRunner
 
+
 RUNNER_CLASSES = {
     runner.__name__: runner
     for runner in (
         CustomCriticRunner,
         DataLoggingRunner,
+        EstimatorRunner,
         MyRunner,
         OffPolicyRunner,
         OldPolicyRunner,
@@ -63,6 +66,7 @@ def get_runner_class(name):
 __all__ = [
     "CustomCriticRunner",
     "DataLoggingRunner",
+    "EstimatorRunner",
     "MyRunner",
     "OffPolicyRunner",
     "OldPolicyRunner",
@@ -71,3 +75,4 @@ __all__ = [
     "RUNNER_CLASSES",
     "get_runner_class",
 ]
+

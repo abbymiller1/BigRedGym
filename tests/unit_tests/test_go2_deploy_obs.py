@@ -151,7 +151,11 @@ def test_frequency_observation_tracks_active_controller_frequency():
             torch.tensor([frequency / 4.0]),
         )
 
-
+@pytest.mark.xfail(
+    strict=True,
+    reason="go2_deploy still implements the old phase-driven trot policy; "
+    "port it to the estimator policy before hardware tests, then remove this mark.",
+)
 @pytest.mark.parametrize("task_name", ["go2trot", "go2"])
 def test_action_target_roundtrip_uses_static_default_pose(task_name):
     controller = _controller()

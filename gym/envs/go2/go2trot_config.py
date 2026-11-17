@@ -1,12 +1,18 @@
+import math
+
 from gym.envs.go2.go2_config import Go2Cfg, Go2RunnerCfg
 
 
 class Go2TrotCfg(Go2Cfg):
+    """Go2 running, following Ji et al. (RA-L 2022). Gait is not prescribed."""
+
     class env(Go2Cfg.env):
-        episode_length_s = 5
+        num_envs = 2**12
+        episode_length_s = 10
+        history_steps = [2, 4, 6]  # joint history at t-0.02/0.04/0.06 s
 
     class init_state(Go2Cfg.init_state):
-        # Policy targets are offsets from this static nominal posture.
+        # q_nominal. Key names match go2_deploy/deploy_config.py, which reads them.
         default_joint_angles = {
             "hip_joint": 0.0,
             "calf_joint": -1.36,
@@ -15,190 +21,148 @@ class Go2TrotCfg(Go2Cfg):
             "RL_thigh_joint": 0.96,
             "RR_thigh_joint": 0.96,
         }
-        reset_mode = "reset_to_basic"
-
+        reset_mode = "reset_to_range"
+        # Paper Table I: joints +/-0.2 rad, +/-2.5 rad/s around nominal
+        dof_pos_range = {"hip": [-0.2, 0.2], "thigh": [0.76, 1.16], "calf": [-1.56, -1.16]}
+        dof_vel_range = {"hip": [-2.5, 2.5], "thigh": [-2.5, 2.5], "calf": [-2.5, 2.5]}
         root_pos_range = [
-            [0.0, 0.0],  # x
-            [0.0, 0.0],  # y
-            [0.450, 0.50],  # z
-            [0.0, 0.0],  # roll
-            [0.0, 0.0],  # pitch
-            [0.0, 0.0],  # yaw
+            [0.0, 0.0], [0.0, 0.0], [0.40, 0.45],          # x, y, z
+            [-0.2, 0.2], [-0.2, 0.2], [-math.pi, math.pi],  # roll, pitch, yaw
         ]
         root_vel_range = [
-            [-0.5, 3.0],  # x
-            [-0.1, 0.1],  # y
-            [-0.05, 0.05],  # z
-            [0.0, 0.0],  # roll
-            [0.0, 0.0],  # pitch
-            [0.0, 0.0],  # yaw
+            [-1.0, 1.0], [-0.5, 0.5], [-0.5, 0.5],          # vx, vy, vz
+            [-0.7, 0.7], [-0.7, 0.7], [-0.7, 0.7],          # wx, wy, wz
         ]
 
     class control(Go2Cfg.control):
         stiffness = {"hip": 20.0, "thigh": 20.0, "calf": 20.0}
         damping = {"hip": 0.5, "thigh": 0.5, "calf": 0.5}
-        ctrl_frequency = 50
-        desired_sim_frequency = 50
-        gait_freq = [1.0, 3.0]  # oscillator frequency range [Hz]
-        # Cycle offsets define a trot: front-left/rear-right move together,
-        # half a cycle away from front-right/rear-left.
-        gait_phase_offsets = {
-            "FL_foot": 0.0,
-            "FR_foot": 0.5,
-            "RL_foot": 0.5,
-            "RR_foot": 0.0,
-        }
-        # Canonical order is FL, FR, RL, RR; hip, thigh, calf within each leg.
-        # q_ref = offset + amplitude * sin(phase + leg_phase).
-        # Reward-only offsets from default_dof_pos, never added to PD targets.
-        # The thigh/calf amplitudes approximately preserve fore-aft foot
-        # position while alternately extending the stance diagonal and
-        # shortening the swing diagonal.
-        gait_joint_offsets = 4 * [0.0, 0.0, 0.0]
-        gait_joint_amplitudes = 4 * [0.0, -0.15, 0.30]
+        ctrl_frequency = 100  # paper: policy + estimator at 100 Hz
+        desired_sim_frequency = 200
+        motor_friction_range = {"hip": [0.0, 0.3], "thigh": [0.0, 0.3], "calf": [0.1, 0.7]}
 
     class commands(Go2Cfg.commands):
-        # Standard deviation in m/s around the forward-command centers below.
-        var = 0.1
+        resampling_time = 5.0
+        zero_command_prob = 0.1
+        curriculum = True
 
         class ranges(Go2Cfg.commands.ranges):
-            lin_vel_x = [-0.5, 0.0, 0.5, 1.0, 2.0]
-            lin_vel_y = 0.5
-            yaw_vel = 1.5
+            lin_vel_x_start = [-0.5, 1.0]
+            lin_vel_x = [-1.75, 3.5]  # paper; [-1.0, 2.0] trains faster for your tests
+            lin_vel_y = 1.0
+            yaw_vel = 2.0
 
     class push_robots(Go2Cfg.push_robots):
-        toggle = True
-        interval_s = 5
+        toggle = False  # the paper does not push
 
     class domain_randomization(Go2Cfg.domain_randomization):
         class startup(Go2Cfg.domain_randomization.startup):
-            link_mass_scale_range = [0.9, 1.2]
+            contact_friction_range = [0.4, 1.0]
+            link_mass_scale_range = None  # paper does not randomize mass
 
         class episode(Go2Cfg.domain_randomization.episode):
-            scale_ranges = {
-                "p_gains": [0.9, 1.1],
-                "d_gains": [0.8, 1.2],
-            }
+            # Paper: Kp +/-2, Kd +/-0.1 around 20 / 0.5
+            scale_ranges = {"p_gains": [0.9, 1.1], "d_gains": [0.8, 1.2]}
 
     class asset(Go2Cfg.asset):
-        file = "{GYM_ROOT_DIR}/resources/robots/" + "go2/urdf/go2.urdf"
-        # Use the SDK's OBJ visuals; keep our URDF's complete physical model.
-        vsim_visual_mesh_dir = "{GYM_ROOT_DIR}/thirdparty/vlearn/assets/go2/assets"
-        foot_name = "foot"
-        penalize_contacts_on = ["calf"]
-        terminate_after_contacts_on = ["base"]
-        end_effector_names = ["foot"]
-        fix_base_link = False
-        disable_gravity = False
-        disable_motors = False
+        # Paper: any contact other than knees/feet terminates (-10)
+        terminate_after_contacts_on = ["base", "Head", "hip", "thigh"]
+        penalize_contacts_on = []
+        foot_radius = 0.022  # go2.urdf
 
     class reward_settings(Go2Cfg.reward_settings):
-        base_height_target = Go2Cfg.reward_settings.base_height_target
+        foot_clearance_target = 0.09  # [m]
+        contact_force_threshold = 1.0  # [N]
+
+        class ji:  # Ji et al. Table II
+            lin_vel = 3.0
+            ang_vel = 3.0
+            air_time = 0.3
+            foot_slip = -0.08
+            foot_clearance = -15.0
+            orientation = -3.0
+            torque = -6e-4
+            joint_pos = -0.75
+            joint_vel = -6e-4
+            joint_acc = -0.02
+            smooth1 = -2.5
+            smooth2 = -1.2
+            base_motion = -1.5
+            neg_scale = 0.2
 
     class scaling(Go2Cfg.scaling):
-        # Canonical RobotLayout order is FL, FR, RL, RR, with
-        # hip, thigh, calf inside each leg. Backends map native order to it.
-        base_height = 0.3
-        dof_pos = 4 * [1.0472, 2.53075, 0.94247]
-        dof_pos_obs = dof_pos
-        # Residual radians per policy unit, independent of observation ranges.
-        dof_pos_target = 4 * [0.2, 0.3, 0.3]
-        tau_ff = 4 * [23.7, 23.7, 45.43]
+        dof_pos_target = 4 * [0.1, 0.1, 0.1]  # paper sigma_a; try [0.2,0.3,0.3] if stuck
+        dof_pos_target_hist = 2 * Go2Cfg.scaling.dof_pos  # list repeat -> 24
+        dof_vel_hist = 3 * Go2Cfg.scaling.dof_vel  # -> 36
 
 
 class Go2TrotRunnerCfg(Go2RunnerCfg):
-    class actor:
-        hidden_dims = [256, 256, 128]
-        # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
+    runner_class_name = "EstimatorRunner"
+
+    class actor(Go2RunnerCfg.actor):
+        hidden_dims = [512, 256, 64]
         activation = "elu"
+        normalize_obs = True
         obs = [
-            "base_ang_vel",
-            "projected_gravity",
-            "commands",
-            "dof_pos_obs",
-            "dof_vel",
-            "dof_pos_target",
-            "phase_obs",
-            "phase_frequency",
+            "projected_gravity", "base_ang_vel", "dof_pos_obs", "dof_vel",
+            "dof_pos_target_hist", "dof_pos_err_hist", "dof_vel_hist",
+            "foot_pos_body", "commands",
         ]
-        normalize_obs = False
-        smooth_exploration = False
         actions = ["dof_pos_target"]
-        add_noise = False
-        disable_actions = False
 
-        class noise:
-            scale = 1.0
-            dof_pos_obs = 0.01
-            base_ang_vel = 0.01
-            dof_pos = 0.005
-            dof_vel = 0.005
-            lin_vel = 0.05
-            ang_vel = [0.3, 0.15, 0.4]
-            gravity_vec = 0.1
+        class noise:  # uniform half-widths U(-a, a), physical units (paper)
+            projected_gravity = 0.03
+            base_ang_vel = 0.1
+            dof_pos_obs = 0.05
+            dof_vel = 0.5
+            dof_pos_err_hist = 0.05
+            dof_vel_hist = 0.5
+            foot_pos_body = 4 * [0.01, 0.005, 0.02]
 
-    class critic:
-        hidden_dims = [128, 64]
-        # * can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
+    class critic(Go2RunnerCfg.critic):
+        hidden_dims = [512, 256, 64]
         activation = "elu"
+        normalize_obs = True
         obs = [
-            "base_height",
-            "base_lin_vel",
-            "base_ang_vel",
-            "projected_gravity",
-            "commands",
-            "dof_pos_obs",
-            "dof_vel",
-            "dof_pos_target",
-            "phase_obs",
-            "phase_frequency",
+            "base_lin_vel", "base_height", "foot_height", "foot_contact",
+            "projected_gravity", "base_ang_vel", "dof_pos_obs", "dof_vel",
+            "dof_pos_target_hist", "foot_pos_body", "commands",
         ]
-        normalize_obs = False
 
         class reward:
             class weights:
-                tracking_lin_vel = 4.0
-                tracking_ang_vel = 4.0
-                lin_vel_z = 0.0
-                ang_vel_xy = 0.01
-                orientation = 1.0
-                torques = 5.0e-6
-                dof_vel = 0.0
-                stand_still = 0.0
-                dof_pos_limits = 0.0
-                feet_contact_forces = 0.0
-                dof_near_home = 0.0
-                min_base_height = 0.5
-                action_rate = 0.1
-                action_rate2 = 0.05
-                trot_support = 3.0
-                swing_contact = 3.0
-                reference_traj = 3.0
+                ji_total = 1.0
 
             class termination_weight:
-                termination = 0.01
+                termination = 10.0  # rewards are all scaled by dt -> paper's -10
 
-    class algorithm:
-        # both
-        gamma = 0.99
-        lam = 0.95
-        # shared
-        batch_size = 2**15
-        max_gradient_steps = 24
-        # new
-        clip_param = 0.2
-        learning_rate = 1.0e-3
-        max_grad_norm = 1.0
-        rollout_size = 2**16
-        # Critic
-        use_clipped_value_loss = True
-        # Actor
+    class state_estimator:
+        targets = ["base_lin_vel", "foot_height", "foot_contact"]  # velocity first
+        use_true_velocity = False
+
+        class network:
+            hidden_dims = [256, 128]
+            activation = "elu"
+            dropouts = 0.0
+
+        class algorithm:
+            learning_rate = 1.0e-3
+            num_mini_batches = 8
+            num_learning_epochs = 4
+
+    class algorithm(Go2RunnerCfg.algorithm):
         entropy_coef = 0.001
-        schedule = "adaptive"  # could be adaptive, fixed
-        desired_kl = 0.01
-        lr_range = [2e-5, 1e-2]
-        lr_ratio = 1.5
 
     class runner(Go2RunnerCfg.runner):
         experiment_name = "go2trot"
-        max_iterations = 500
+        max_iterations = 2500
+
+
+class Go2TrotTrueVelRunnerCfg(Go2TrotRunnerCfg):
+    """Baseline: identical, but the actor gets the TRUE body velocity."""
+
+    class state_estimator(Go2TrotRunnerCfg.state_estimator):
+        use_true_velocity = True
+
+    class runner(Go2TrotRunnerCfg.runner):
+        experiment_name = "go2trot_truevel"

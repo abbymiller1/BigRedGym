@@ -130,9 +130,11 @@ def setup(args):
     return env, runner
 
 
-def play(env, runner):
+def play(env, runner, print_every_s=0.5):
     n_steps = 10 * int(env.max_episode_length)
-    for _ in range(n_steps):
+    print_every = max(1, int(round(print_every_s / env.dt)))
+    has_estimator = hasattr(runner, "estimated_base_lin_vel")
+    for step in range(n_steps):
         runner.set_actions(
             runner.actor_cfg["actions"],
             runner.get_inference_actions(),
@@ -140,6 +142,17 @@ def play(env, runner):
         )
         env.step()
         env.check_exit()
+        if has_estimator and step % print_every == 0:
+            est = runner.estimated_base_lin_vel()[0]
+            true = env.base_lin_vel[0]
+            cmd = env.commands[0]
+            mu = env._backend.contact_friction[0].item()
+            print(
+                f"mu={mu:.2f}  cmd vx={cmd[0]:+.2f}  "
+                f"true vx={true[0]:+.2f} vy={true[1]:+.2f}  "
+                f"est vx={est[0]:+.2f} vy={est[1]:+.2f}  "
+                f"err={torch.norm(est[:2] - true[:2]):.3f} m/s"
+            )
 
 
 if __name__ == "__main__":

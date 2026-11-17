@@ -481,8 +481,13 @@ def test_go2trot_sparse_reset_mask_isolates_task_and_gait_buffers():
         env.commands[:] = row + 40.0
         env.dof_pos_target[:] = row + 50.0
         env.dof_pos_history[:] = row + 60.0
-        env.phase[:] = row + 70.0
-        env.phase_frequency[:] = row + 80.0
+        env.feet_air_time[:] = row + 70.0
+        env.feet_stance_time[:] = row + 71.0
+        env.motor_friction[:] = row + 72.0
+        env.last_dof_vel[:] = row + 73.0
+        env.dof_pos_target_hist[:] = row + 74.0
+        env.dof_pos_err_hist[:] = row + 75.0
+        env.dof_vel_hist[:] = row + 76.0
         env.episode_length_buf[:] = torch.arange(env.num_envs) + 90
         p_scale = env.domain_randomizer.episode_scale("p_gains")
         d_scale = env.domain_randomizer.episode_scale("d_gains")
@@ -495,8 +500,13 @@ def test_go2trot_sparse_reset_mask_isolates_task_and_gait_buffers():
                 "commands",
                 "dof_pos_target",
                 "dof_pos_history",
-                "phase",
-                "phase_frequency",
+                "feet_air_time", 
+                "feet_stance_time", 
+                "motor_friction", 
+                "last_dof_vel",
+                "dof_pos_target_hist", 
+                "dof_pos_err_hist", 
+                "dof_vel_hist",
                 "episode_length_buf",
             )
         }
