@@ -150,7 +150,7 @@ class Go2Cfg(LeggedRobotCfg):
         base_height = 0.3
         dof_pos = 4 * [1.0472, 2.53075, 0.94247]
         dof_pos_obs = dof_pos
-        dof_pos_target = [0.5 * x for x in dof_pos]
+        dof_pos_target = 4 * [0.2, 0.3, 0.3]  # Go2 needs more than the paper's 0.1
         tau_ff = 4 * [23.7, 23.7, 45.43]
         commands = [3, 1, 3]
 
