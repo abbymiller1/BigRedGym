@@ -44,11 +44,11 @@ class Go2TrotCfg(Go2Cfg):
     class commands(Go2Cfg.commands):
         resampling_time = 5.0
         zero_command_prob = 0.1
-        curriculum = True
+        curriculum = False
 
         class ranges(Go2Cfg.commands.ranges):
             lin_vel_x_start = [-0.5, 1.0]
-            lin_vel_x = [-1.75, 3.5]  # paper; [-1.0, 2.0] trains faster for your tests
+            lin_vel_x = [-0.5, 2.0]  # paper; [-1.0, 2.0] trains faster for your tests
             lin_vel_y = 1.0
             yaw_vel = 2.0
 
@@ -57,7 +57,7 @@ class Go2TrotCfg(Go2Cfg):
 
     class domain_randomization(Go2Cfg.domain_randomization):
         class startup(Go2Cfg.domain_randomization.startup):
-            contact_friction_range = [0.4, 1.0]
+            contact_friction_range = [0.2, 1.0]
             link_mass_scale_range = None  # paper does not randomize mass
 
         class episode(Go2Cfg.domain_randomization.episode):
@@ -151,7 +151,7 @@ class Go2TrotRunnerCfg(Go2RunnerCfg):
             num_learning_epochs = 4
 
     class algorithm(Go2RunnerCfg.algorithm):
-        entropy_coef = 0.001
+        entropy_coef = 0.005
 
     class runner(Go2RunnerCfg.runner):
         experiment_name = "go2trot"
